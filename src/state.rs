@@ -26,7 +26,7 @@ pub struct AppState {
     /// Current tab
     current_tab: ListState,
     /// Current search query
-    search_query: String,
+    search_query: Vec<char>,
     /// Current items
     items: Vec<ListEntry>,
     /// This stack keeps track of our "current dirrectory". You can think of it as `pwd`. but not
@@ -60,7 +60,7 @@ impl AppState {
             temp_path,
             focus: Focus::List,
             current_tab: ListState::default().with_selected(Some(0)),
-            search_query: String::new(),
+            search_query: vec![],
             items: vec![],
             visit_stack: vec![root_id],
             selection: ListState::default().with_selected(Some(0)),
@@ -107,10 +107,11 @@ impl AppState {
             .constraints([Constraint::Length(3), Constraint::Min(1)].as_ref())
             .split(horizontal[1]);
 
+        let search_query_text = || Span::raw(self.search_query.iter().collect::<String>());
         // Render search bar
         let search_text = match self.focus {
-            Focus::Search => Span::raw(&self.search_query),
-            _ if !self.search_query.is_empty() => Span::raw(&self.search_query),
+            Focus::Search => search_query_text(),
+            _ if !self.search_query.is_empty() => search_query_text(),
             _ => Span::raw("Press / to search"),
         };
 
@@ -189,7 +190,7 @@ impl AppState {
                     KeyCode::Esc => {
                         self.character_pos = 0;
                         self.selection.select(Some(0));
-                        self.search_query = String::new();
+                        self.search_query.clear();
                         self.exit_search();
                     }
                     KeyCode::Enter => self.exit_search(),
@@ -257,7 +258,7 @@ impl AppState {
         } else {
             self.items.clear();
 
-            let query_lower = self.search_query.to_lowercase();
+            let query_lower = self.search_query.iter().collect::<String>().to_lowercase();
             for tab in TABS.iter() {
                 let mut stack = vec![tab.tree.root().id()];
                 while let Some(node_id) = stack.pop() {
@@ -368,11 +369,7 @@ impl AppState {
         let current = self.character_pos;
         if current > 0 {
             // We use take and skip because those are non panicking methods
-            let previous = current - 1;
-            let before_char = self.search_query.chars().take(previous);
-            let after_char = self.search_query.chars().skip(current);
-
-            self.search_query = before_char.chain(after_char).collect();
+            self.search_query.remove(current - 1);
             self.cursor_left();
         }
     }
@@ -381,9 +378,7 @@ impl AppState {
         let current = self.character_pos;
         if current < self.search_query.len() {
             // We use take and skip because those are non panicking methods
-            let after_char = self.search_query.chars().skip(current + 1);
-            let before_char = self.search_query.chars().take(current);
-            self.search_query = before_char.chain(after_char).collect();
+            self.search_query.remove(current);
         }
     }
 }
