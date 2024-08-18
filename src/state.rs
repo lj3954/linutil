@@ -15,6 +15,7 @@ use ratatui::{
     Frame,
 };
 use std::path::PathBuf;
+use unicode_width::UnicodeWidthChar;
 
 pub struct AppState {
     /// Selected theme
@@ -127,8 +128,12 @@ impl AppState {
 
         // Set the corsor in the search bar when we focus it
         if let Focus::Search = self.focus {
+            let cursor_position: usize = self.search_query[..self.character_pos]
+                .iter()
+                .map(|c| c.width().unwrap_or(1))
+                .sum();
             // Set x as the begining of the block + number of characters + 1 for margin
-            let x = chunks[0].x + self.character_pos as u16 + 1;
+            let x = chunks[0].x + cursor_position as u16 + 1;
             // Set y as the top of the block + 1 to center
             let y = chunks[0].y + 1;
             frame.set_cursor(x, y);
