@@ -1,6 +1,9 @@
 use std::borrow::Cow;
 
-use crate::{float::FloatContent, hint::Shortcut};
+use crate::{
+    float::{FloatContent, FloatEvent},
+    hint::Shortcut,
+};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
@@ -9,15 +12,8 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List},
 };
 
-pub enum ConfirmStatus {
-    Confirm,
-    Abort,
-    None,
-}
-
 pub struct ConfirmPrompt {
     pub names: Box<[String]>,
-    pub status: ConfirmStatus,
     scroll: usize,
 }
 
@@ -29,11 +25,7 @@ impl ConfirmPrompt {
             .map(|(name, n)| format!("{n}. {name}"))
             .collect();
 
-        Self {
-            names,
-            status: ConfirmStatus::None,
-            scroll: 0,
-        }
+        Self { names, scroll: 0 }
     }
 
     pub fn scroll_down(&mut self) {
@@ -76,31 +68,20 @@ impl FloatContent for ConfirmPrompt {
         frame.render_widget(List::new(paths_text), inner_area);
     }
 
-    fn handle_key_event(&mut self, key: &KeyEvent) -> bool {
+    fn handle_key_event(&mut self, key: &KeyEvent) -> FloatEvent {
         use KeyCode::*;
-        self.status = match key.code {
-            Char('y') | Char('Y') => ConfirmStatus::Confirm,
-            Char('n') | Char('N') | Esc => ConfirmStatus::Abort,
-            Char('j') => {
-                self.scroll_down();
-                ConfirmStatus::None
-            }
-            Char('k') => {
-                self.scroll_up();
-                ConfirmStatus::None
-            }
-            _ => ConfirmStatus::None,
+        match key.code {
+            Char('y') | Char('Y') => return FloatEvent::ConfirmSelection,
+            Char('n') | Char('N') | Esc => return FloatEvent::AbortConfirmation,
+            Char('j') => self.scroll_down(),
+            Char('k') => self.scroll_up(),
+            _ => {}
         };
-
-        false
+        FloatEvent::None
     }
 
     fn is_finished(&self) -> bool {
-        use ConfirmStatus::*;
-        match self.status {
-            Confirm | Abort => true,
-            None => false,
-        }
+        true
     }
 
     fn get_shortcut_list(&self) -> (&str, Box<[Shortcut]>) {

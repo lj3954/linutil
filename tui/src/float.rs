@@ -6,21 +6,28 @@ use ratatui::{
 
 use crate::hint::Shortcut;
 
+pub enum FloatEvent {
+    Close,
+    AbortConfirmation,
+    ConfirmSelection,
+    None,
+}
+
 pub trait FloatContent {
     fn draw(&mut self, frame: &mut Frame, area: Rect);
-    fn handle_key_event(&mut self, key: &KeyEvent) -> bool;
+    fn handle_key_event(&mut self, key: &KeyEvent) -> FloatEvent;
     fn is_finished(&self) -> bool;
     fn get_shortcut_list(&self) -> (&str, Box<[Shortcut]>);
 }
 
-pub struct Float<Content: FloatContent + ?Sized> {
-    pub content: Box<Content>,
+pub struct Float {
+    pub content: Box<dyn FloatContent>,
     width_percent: u16,
     height_percent: u16,
 }
 
-impl<Content: FloatContent + ?Sized> Float<Content> {
-    pub fn new(content: Box<Content>, width_percent: u16, height_percent: u16) -> Self {
+impl Float {
+    pub fn new(content: Box<dyn FloatContent>, width_percent: u16, height_percent: u16) -> Self {
         Self {
             content,
             width_percent,
@@ -53,8 +60,7 @@ impl<Content: FloatContent + ?Sized> Float<Content> {
         self.content.draw(frame, popup_area);
     }
 
-    // Returns true if the floating window is finished.
-    pub fn handle_key_event(&mut self, key: &KeyEvent) -> bool {
+    pub fn handle_key_event(&mut self, key: &KeyEvent) -> FloatEvent {
         match key.code {
             KeyCode::Enter
             | KeyCode::Char('p')
@@ -63,7 +69,7 @@ impl<Content: FloatContent + ?Sized> Float<Content> {
             | KeyCode::Esc
                 if self.content.is_finished() =>
             {
-                true
+                FloatEvent::Close
             }
             _ => self.content.handle_key_event(key),
         }

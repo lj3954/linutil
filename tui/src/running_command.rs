@@ -1,4 +1,7 @@
-use crate::{float::FloatContent, hint::Shortcut};
+use crate::{
+    float::{FloatContent, FloatEvent},
+    hint::Shortcut,
+};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use linutil_core::Command;
 use oneshot::{channel, Receiver};
@@ -90,9 +93,8 @@ impl FloatContent for RunningCommand {
         frame.render_widget(pseudo_term, area);
     }
 
-    /// Handle key events of the running command "window". Returns true when the "window" should be
-    /// closed
-    fn handle_key_event(&mut self, key: &KeyEvent) -> bool {
+    /// Handle key events of the running command "window".
+    fn handle_key_event(&mut self, key: &KeyEvent) -> FloatEvent {
         match key.code {
             // Handle Ctrl-C to kill the command
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -100,12 +102,12 @@ impl FloatContent for RunningCommand {
             }
             // Close the window when Enter is pressed and the command is finished
             KeyCode::Enter if self.is_finished() => {
-                return true;
+                return FloatEvent::Close;
             }
             // Pass other key events to the terminal
             _ => self.handle_passthrough_key_event(key),
         }
-        false
+        FloatEvent::None
     }
 
     fn is_finished(&self) -> bool {

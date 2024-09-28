@@ -1,9 +1,9 @@
 use std::rc::Rc;
 
 use crate::{
-    confirmation::{ConfirmPrompt, ConfirmStatus},
+    confirmation::ConfirmPrompt,
     filter::{Filter, SearchAction},
-    float::{Float, FloatContent},
+    float::{Float, FloatContent, FloatEvent},
     floating_text::{FloatingText, FloatingTextMode},
     hint::{create_shortcut_list, Shortcut},
     running_command::RunningCommand,
@@ -66,8 +66,7 @@ pub enum Focus {
     Search,
     TabList,
     List,
-    FloatingWindow(Float<dyn FloatContent>),
-    ConfirmationPrompt(Float<ConfirmPrompt>),
+    FloatingWindow(Float),
 }
 
 pub struct ListEntry {
@@ -168,7 +167,6 @@ impl AppState {
             ),
 
             Focus::FloatingWindow(ref float) => float.get_shortcut_list(),
-            Focus::ConfirmationPrompt(ref prompt) => prompt.get_shortcut_list(),
         }
     }
 
@@ -394,10 +392,8 @@ impl AppState {
 
         frame.render_stateful_widget(disclaimer_list, list_chunks[1], &mut self.selection);
 
-        match &mut self.focus {
-            Focus::FloatingWindow(float) => float.draw(frame, chunks[1]),
-            Focus::ConfirmationPrompt(prompt) => prompt.draw(frame, chunks[1]),
-            _ => {}
+        if let Focus::FloatingWindow(float) = &mut self.focus {
+            float.draw(frame, chunks[1]);
         }
 
         frame.render_widget(keybind_para, vertical[1]);
@@ -407,11 +403,9 @@ impl AppState {
         // This should be defined first to allow closing
         // the application even when not drawable ( If terminal is small )
         // Exit on 'q' or 'Ctrl-c' input
-        if matches!(
-            self.focus,
-            Focus::TabList | Focus::List | Focus::ConfirmationPrompt(_)
-        ) && (key.code == KeyCode::Char('q')
-            || key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c'))
+        if matches!(self.focus, Focus::TabList | Focus::List)
+            && (key.code == KeyCode::Char('q')
+                || key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c'))
         {
             return false;
         }
@@ -448,15 +442,9 @@ impl AppState {
 
         match &mut self.focus {
             Focus::FloatingWindow(command) => {
-                if command.handle_key_event(key) {
-                    self.focus = Focus::List;
-                }
-            }
-
-            Focus::ConfirmationPrompt(confirm) => {
-                confirm.content.handle_key_event(key);
-                match confirm.content.status {
-                    ConfirmStatus::Abort => {
+                match command.handle_key_event(key) {
+                    FloatEvent::Close => self.focus = Focus::List,
+                    FloatEvent::AbortConfirmation => {
                         self.focus = Focus::List;
                         // selected command was pushed to selection list if multi-select was
                         // enabled, need to clear it to prevent state corruption
@@ -464,8 +452,8 @@ impl AppState {
                             self.selected_commands.clear()
                         }
                     }
-                    ConfirmStatus::Confirm => self.handle_confirm_command(),
-                    ConfirmStatus::None => {}
+                    FloatEvent::ConfirmSelection => self.handle_confirm_command(),
+                    FloatEvent::None => {}
                 }
             }
 
@@ -681,7 +669,7 @@ impl AppState {
                 .collect::<Vec<_>>();
 
             let prompt = ConfirmPrompt::new(&cmd_names[..]);
-            self.focus = Focus::ConfirmationPrompt(Float::new(Box::new(prompt), 40, 40));
+            self.spawn_float(prompt, 40, 40);
         } else {
             self.go_to_selected_dir();
         }

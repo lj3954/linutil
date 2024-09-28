@@ -4,7 +4,10 @@ use std::{
     io::{Cursor, Read as _, Seek, SeekFrom, Write as _},
 };
 
-use crate::{float::FloatContent, hint::Shortcut};
+use crate::{
+    float::{FloatContent, FloatEvent},
+    hint::Shortcut,
+};
 
 use linutil_core::Command;
 
@@ -274,7 +277,7 @@ impl FloatContent for FloatingText {
         frame.render_widget(list, inner_area);
     }
 
-    fn handle_key_event(&mut self, key: &KeyEvent) -> bool {
+    fn handle_key_event(&mut self, key: &KeyEvent) -> FloatEvent {
         use KeyCode::*;
         match key.code {
             Down | Char('j') => self.scroll_down(),
@@ -283,7 +286,7 @@ impl FloatContent for FloatingText {
             Right | Char('l') => self.scroll_right(),
             _ => {}
         }
-        false
+        FloatEvent::None
     }
 
     fn is_finished(&self) -> bool {
